@@ -1,0 +1,78 @@
+
+Part 1
+https://chatgpt.com/c/6833ec56-3fd8-8006-b3bb-49ecd2852a01
+
+sudo apt update && sudo apt upgrade -y
+
+sudo apt install unattened-upgrades -y
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+sudo nano /etc/apt/apt.conf.d/20auto-upgrades 
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+
+Part 2
+https://chatgpt.com/c/6833ee82-e990-8006-b579-1bbbc69c83f8
+sudo nano /etc/ssh/sshd_config
+PermitRootLogin no
+sudo systemctl restart sshd
+
+on my pc
+ssh-keygen -t rsa -b 4096
+ssh-copy-id thomas@20.244.16.117
+#ssh-copy-id  copies your public key (usually from ~/.ssh/id_rsa.pub) to the remote server’s ~/.ssh/authorized_keys file.
+
+on VM
+sudo nano /etc/ssh/ssh_config
+(
+PasswordAuthentication no
+PubkeyAuthentication yes
+UsePAM no
+)
+In our ssh_config file we have Include /etc/ssh/sshd_config.d/*.conf
+so any of those file would override our ssd_config file 
+so we have to check the settings in those files too 
+(grep -ri 'PasswordAuthentication\|UsePAM' /etc/ssh/sshd_config.d/)
+
+sudo nano /etc/ssh/sshd_config.d/50-cloud-init.conf
+(
+PasswordAuthentication no
+)
+
+sudo systemctl restart sshd
+# Now it is possible to login to VM just by ssh thomas@20.244.16.117
+
+#not done restricting IP's task
+
+
+https://chatgpt.com/c/6833ff97-47d4-8006-8e0e-18f3753f8808
+
+setting up fail2ban
+sudo apt install fail2ban
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+
+We keep a local file since if fail2ban gets updated, the updates override teh changes we've made to jail.conf
+Fail2ban prioritizes the settings in jail.local over jail.conf
+
+sudo nano /etc/fail2ban/jail.local
+(
+[DEFAULT]
+
+bantime =1h
+findtime= 30m
+maxretry= 5
+
+[sshd]
+enabled=true
+port= ssh
+filter=sshd
+logpath /var/log/auth.log
+)
+sudo systemctl restart fail2ban
+sudo systemctl enable fail2ban
+
+testing logs
+to test turn on password auth 
+thomas@SSL-Admin:~$ sudo tail -f /var/log/auth.log to check live logs
+
+
