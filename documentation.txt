@@ -76,3 +76,47 @@ to test turn on password auth
 thomas@SSL-Admin:~$ sudo tail -f /var/log/auth.log to check live logs
 
 
+Part 3
+https://chatgpt.com/c/68369007-4074-8006-83f9-689bf09a03a6
+
+sudo apt install ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+sudo nano /etc/ssh/sshd_config
+(
+Port 22 -> Port 2222
+)
+sudo systemctl restart ssh
+
+sudo ufw allow 2222/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+sudo ufw logging on
+(available at /var/log/ufw.log)
+sudo ufw loggin low (change level if req)
+sudo ufw enable
+
+Now go to azure portal, locate to your VM, then under networking go to network settings and add inbound port
+create a new inbound port rule,
+
+destination port ranges 2222 
+protocol tcp since ssh only uses tcp
+priority 100 (just in case to overrule any Deny rules)
+
+checking if it works
+sudo ss -tnlp | grep sshd
+# LISTEN 0 128 0.0.0.0:2222 *:* users:(("sshd",pid=1234,fd=3))
+
+nmap -Pn -p 22 20.244.16.117
+#Starting Nmap 7.94SVN ( https://nmap.org ) at 2025-05-27 10:49 IST
+#Nmap scan report for 20.244.16.117
+#Host is up.
+
+#PORT   STATE    SERVICE
+#22/tcp filtered ssh
+
+#Nmap done: 1 IP address (1 host up) scanned in 2.11 seconds
+
+
