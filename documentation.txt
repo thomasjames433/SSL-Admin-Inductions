@@ -120,3 +120,43 @@ nmap -Pn -p 22 20.244.16.117
 #Nmap done: 1 IP address (1 host up) scanned in 2.11 seconds
 
 
+Part 4
+
+1.
+https://chatgpt.com/c/68369721-a51c-8006-9543-31bfdf61b802
+
+sudo useradd -m exam_1
+sudo useradd -m exam_2
+sudo useradd -m exam_3
+sudo chmod 700 /home/exam_1
+sudo chmod 700 /home/exam_2
+sudo chmod 700 /home/exam_3
+
+sudo useradd -m examadmin
+sudo usermod -aG sudo examadmin
+
+sudo useradd -m examaudit
+sudo groupadd auditgroup
+sudo usermod -aG audirgroup examaudit
+
+for user in exam_1 exam_2 exam_3; do
+  homedir="/home/$user"
+
+  # 1. Set group ownership to auditgroup
+  sudo chgrp -R auditgroup "$homedir"
+
+  # 2. Set directory permissions: owner = rwx, group = r-x, others = ---
+  #Directory /home/exam_1 needs at least execute (x) permission for the group to enter it.
+
+  sudo find "$homedir" -type d -exec chmod 750 {} \;
+
+  # 3. Set file permissions: owner = rwx, group = r--, others = ---
+  sudo find "$homedir" -type f -exec chmod 740 {} \;
+
+  # 4. Set the setgid bit so new items inherit group
+  sudo chmod g+sx "$homedir"
+
+  # 5. Set default ACLs: group gets rx, others get nothing
+  sudo setfacl -d -m g::rx "$homedir"
+  sudo setfacl -d -m o::--- "$homedir"
+done
