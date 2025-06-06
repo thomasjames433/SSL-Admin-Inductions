@@ -160,3 +160,138 @@ for user in exam_1 exam_2 exam_3; do
   sudo setfacl -d -m g::rx "$homedir"
   sudo setfacl -d -m o::--- "$homedir"
 done
+
+3:
+sudo nano /usr/local/bin/backup_exam_users.sh
+(
+#!/bin/bash
+
+if [ "$(whoami)" != "examadmin" ];then
+echo "No permission to run the file"
+exit 1
+fi
+
+BACKUP_DIR="/var/backups/exam_users"
+TIMESTAMP=$(date +%F_%H-%M-%S)
+BACKUP_FILE="$BACKUP_DIR/exam_users_backup_$TIMESTAMP.tar.gz"
+
+sudo mkdir -p /var/backups/exam_users
+
+mkdir -p "$BACKUP_DIR"
+
+tar -czf "$BACKUP_FILE" /home/exam_*
+
+chmod 600 "$BACKUP_FILE"
+echo "✅Backup completed: $BACKUP_FILE"
+)
+
+for user in exam_1 exam_2 exam_3; do   
+sudo setfacl -m u:examadmin:rx /home/$user;   
+sudo setfacl -R -m u:examadmin:rX /home/$user;   
+sudo setfacl -d -m u:examadmin:rx /home/$user; 
+done
+
+
+sudo chmod 700 /usr/local/bin/backup_exam_users.sh
+sudo chown examadmin:examadmin /usr/local/bin/backup_exam_users.sh
+
+crontab -e
+42 13 * * * /usr/local/bin/backup_exam_users.sh
+backups at 13:42 everyday
+
+
+
+Part 6
+https://chatgpt.com/c/68412ffc-ea28-8006-bdf1-17cb6d65da9d
+1:
+sudo apt install mariadb-server -y
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+sudo mysql_secure_installation
+(
+Enter current password for root (enter for none): 
+Switch to unix_socket authentication [Y/n] n
+Change the root password? [Y/n] n
+Remove anonymous users? [Y/n] Y
+Disallow root login remotely? [Y/n] Y
+Remove test database and access to it? [Y/n] Y
+Reload privilege tables now? [Y/n] 
+)
+
+sudo mysql -u root -p
+(
+create database secure_onboarding;
+create user 'onboarding_user'@'localhost' identified by 'onboarding_user';
+grant select,insert,update on secure_onboarding.* to 'onboarding_user'@'localhost'
+)
+2:
+(root preset to localhost)
+bind-address            = 127.0.0.1  (also preset)
+
+sudo nano /usr/local/bin/mariadb_backup.sh
+#!/bin/bash
+TIMESTAMP=$(date +"%F_%H-%M-%S")
+BACKUP_DIR="/var/backups/mariadb"
+mkdir -p "$BACKUP_DIR"
+mysqldum -u root -p > "$BACKUP_DIR/secure_onboarding_$TIMESTAMP.sql"
+sudo crontab -e
+(
+0 2 * * * /usr/local/bin/mariadb_backup.sh
+)
+
+
+Part 7
+
+sudo apt install wireguard
+wg genkey | tee server_private.key | wg pubkey > server_public.key
+chmod 600 server_private.key
+
+sudo nano /etc/wireguard/wg0.conf
+(
+[Interface]
+PrivateKey = GMG/PfgORvHpNRNTp3hT6I4dQsHGZjvh7pVLrmGnrno=
+Address = 10.0.0.1/24
+ListenPort = 51820
+SaveConfig = true
+
+# Allow routing traffic
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+[Peer]
+PublicKey = pHmar4V6o1KQY+jHsmucb3kyAxlIbUqKcv0ihlLi1ww=
+AllowedIPs = 10.0.0.2/32
+
+)
+
+sudo nano /etc/sysctl.conf
+(
+net.ipv4.ip_forward = 1
+
+)
+
+sudo sysctl -p
+
+wg genkey | tee user_private.key | wg pubkey > user_public.key
+
+On my PC
+sudo nano /etc/wireguard/user.conf
+(
+[Interface]
+PrivateKey = aAX7z9YTxycp5IAjQRkani+3OKPDpd97a0J3N5PTuFY=
+Address = 10.0.0.2/24
+DNS = 1.1.1.1
+MTU =1028
+
+[Peer]
+PublicKey = 5zpioTJrt+xyKMj193sWE9QpLAbBzXrBGTwdePmu0y0=
+Endpoint = 40.81.233.90:51820
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25
+
+)
+
+Back to my VM
+sudo systemctl start wg-quick@wg0
+sudo systemctl enable wg-quick@wg0
+
