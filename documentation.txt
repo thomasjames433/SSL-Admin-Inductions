@@ -318,3 +318,81 @@ sudo usermod -aG docker thomas
 (exit and re enter VM)
 
 docker run hello-world
+
+2:
+sudo apt update
+sudo apt install nginx -y
+
+mkdir ~/portfolio && cd ~/portfolio
+nano index.html
+
+nano Dockerfile
+(
+FROM nginx:alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY . /usr/share/nginx/html/
+EXPOSE 80
+)
+
+docker build -t my-portfolio .
+docker volume create portfolio_content
+
+docker run --rm -v portfolio_content:/data -v "$(pwd)":/src busybox cp -r /src/. /data
+
+docker run -d --name portfolio-container -v portfolio_content:/usr/share/nginx/html --restart unless-stopped -p 8080:80 my-portfolio
+
+sudo nano /etc/systemd/system/portfolio.service
+(
+[Unit]
+Description=Portfolio Website Container
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker start -a portfolio-container
+ExecStop=/usr/bin/docker stop -t 2 portfolio-container
+
+[Install]
+WantedBy=multi-user.target
+
+)
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable portfolio.service
+sudo systemctl start portfolio.service
+
+sudo ufw allow 'Nginx Full'
+(Go to azure portal and add a http inbound port rule)
+
+sudo nano /etc/nginx/sites-available/default
+(
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+Part 1 update IP
+
+To configure the domain sudo nano /etc/nginx/sites-available/default 
+
+server {
+    listen 80 ;
+    server_name adze.sslnitc.site;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+})
+
+sudo systemctl restart nginx
+
